@@ -1199,7 +1199,7 @@ static int open_send_broadcast(int port, const char* buf, int size)
 
             if (sendto(ask_fd, buf, size, 0, (struct sockaddr *)&remote_addr,
                        sizeof(remote_addr)) != size) {
-                log_perror("open_send_broadcast sendto");
+                log_error() << "open_send_broadcast sendto" << errno;
             }
         }
     }
@@ -1339,7 +1339,7 @@ void DiscoverSched::attempt_scheduler_connect()
     log_info() << "scheduler is on " << schedname << ":" << sport << " (net " << netname << ")" << endl;
 
     if ((ask_fd = prepare_connect(schedname, sport, remote_addr)) >= 0) {
-        fcntl(ask_fd, F_SETFL, O_NONBLOCK);
+       // fcntl(ask_fd, F_SETFL, O_NONBLOCK);
     }
 }
 
@@ -1365,34 +1365,34 @@ MsgChannel *DiscoverSched::try_get_scheduler()
         time_t best_start_time = 0;
         bool multiple = false;
         /* Wait at least two seconds to give all schedulers a chance to answer.*/
-        time_t timeout_time = time(NULL) + 2 + 1;
+        time_t timeout_time = time(NULL) + 2 + 1 + (timeout / 1000);
 
         /* Read/test all packages arrived until now.  */
-        while (get_broad_answer(ask_fd, 0/*timeout*/, buf2,
-                                (struct sockaddr_in *) &remote_addr, &remote_len)
-               && time(NULL) < timeout_time) {
-            int version;
-            time_t start_time;
-            const char* name;
-            get_broad_data(buf2, &name, &version, &start_time);
-            if (strcasecmp(netname.c_str(), name) == 0) {
-                if (version < 33) {
-                    log_info() << "Suitable scheduler found at " << inet_ntoa(remote_addr.sin_addr)
-                        << ":" << ntohs(remote_addr.sin_port) << " (unknown version)" << endl;
-                } else {
-                    log_info() << "Suitable scheduler found at " << inet_ntoa(remote_addr.sin_addr)
-                        << ":" << ntohs(remote_addr.sin_port) << " (version: " << version << ")" << endl;
-                }
-                if (best_version != 0)
-                    multiple = true;
-                if (best_version < version || (best_version == version && best_start_time > start_time)) {
-                    schedname = inet_ntoa(remote_addr.sin_addr);
-                    sport = ntohs(remote_addr.sin_port);
-                    best_version = version;
-                    best_start_time = start_time;
-                }
-            }
-        }
+		while (get_broad_answer(ask_fd, timeout, buf2,
+								(struct sockaddr_in *) &remote_addr, &remote_len)
+			   && time(NULL) < timeout_time) {
+			int version;
+			time_t start_time;
+			const char* name;
+			get_broad_data(buf2, &name, &version, &start_time);
+			if (strcasecmp(netname.c_str(), name) == 0) {
+				if (version < 33) {
+					log_info() << "Suitable scheduler found at " << inet_ntoa(remote_addr.sin_addr)
+					<< ":" << ntohs(remote_addr.sin_port) << " (unknown version)" << endl;
+				} else {
+					log_info() << "Suitable scheduler found at " << inet_ntoa(remote_addr.sin_addr)
+					<< ":" << ntohs(remote_addr.sin_port) << " (version: " << version << ")" << endl;
+				}
+				if (best_version != 0)
+					multiple = true;
+				if (best_version < version || (best_version == version && best_start_time > start_time)) {
+					schedname = inet_ntoa(remote_addr.sin_addr);
+					sport = ntohs(remote_addr.sin_port);
+					best_version = version;
+					best_start_time = start_time;
+				}
+			}
+		}
 
         if (best_version == 0) {
             return 0;
@@ -1408,12 +1408,18 @@ MsgChannel *DiscoverSched::try_get_scheduler()
     if (ask_fd >= 0) {
         int status = connect(ask_fd, (struct sockaddr *) &remote_addr, sizeof(remote_addr));
 
-        if (status == 0 || (status < 0 && errno == EISCONN)) {
+		int Err = 0;
+        if (status == 0 || (status < 0 && ((Err = errno) == EISCONN))) {
             int fd = ask_fd;
             ask_fd = -1;
+			fcntl(fd, F_SETFL, O_NONBLOCK);
             return Service::createChannel(fd,
                                           (struct sockaddr *) &remote_addr, sizeof(remote_addr));
         }
+		else
+		{
+			log_info() << "Error connecting: " << Err;
+		}
     }
 
     return 0;
