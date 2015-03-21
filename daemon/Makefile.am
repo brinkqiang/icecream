@@ -13,6 +13,8 @@ iceccd_LDADD = \
 	$(LIB_KINFO) \
 	$(CAPNG_LDADD)
 
+iceccd_LDFLAGS = -headerpad_max_install_names
+
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/services
 
