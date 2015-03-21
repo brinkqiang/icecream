@@ -262,8 +262,26 @@ bool analyse_argv(const char * const *argv, CompileJob &job, bool icerun, list<s
                 if (const char *opt = argv[i + 1]) {
                     ++i;
                     args.append(opt, Arg_Rest);
-                    if (str_equal(opt, "c++") || str_equal(opt, "c")) {
-                        CompileJob::Language lang = str_equal(opt, "c++") ? CompileJob::Lang_CXX : CompileJob::Lang_C;
+					
+					CompileJob::Language lang = CompileJob::Lang_Custom;
+					if (str_equal(opt, "c++"))
+					{
+						lang = CompileJob::Lang_CXX;
+					}
+					else if (str_equal(opt, "c"))
+					{
+						lang = CompileJob::Lang_C;
+					}
+					else if (str_equal(opt, "objective-c++"))
+					{
+						lang = CompileJob::Lang_OBJC;
+					}
+					else if (str_equal(opt, "objective-c"))
+					{
+						lang = CompileJob::Lang_OBJC;
+					}
+					
+					if (lang != CompileJob::Lang_Custom) {
                         job.setLanguage(lang); // will cause -x used remotely twice, but shouldn't be a problem
                         unsupported = false;
                     }
@@ -320,14 +338,14 @@ bool analyse_argv(const char * const *argv, CompileJob &job, bool icerun, list<s
                         string ext = p.substr(dot_index + 1);
 
                         if (ext[0] != 'h' && ext[0] != 'H' && access(p.c_str(), R_OK)
-                            && access((p + ".gch").c_str(), R_OK)) {
-                            log_info() << "include file or gch file for argument " << a << " " << p
+                            && access((p + ".pch").c_str(), R_OK)) {
+                            log_info() << "include file or pch file for argument " << a << " " << p
                                        << " missing, building locally" << endl;
                             always_local = true;
                         }
                     } else {
                         log_info() << "argument " << a << " " << p << ", building locally" << endl;
-                        always_local = true;    /* Included file is not header.suffix or header.suffix.gch! */
+                        always_local = true;    /* Included file is not header.suffix or header.suffix.pch! */
                     }
 
                     args.append(a, Arg_Local);
@@ -502,7 +520,7 @@ bool analyse_argv(const char * const *argv, CompileJob &job, bool icerun, list<s
 
             // Skip compiler arguments which are followed by another
             // argument not starting with -.
-            if (it->first == "-Xclang" || it->first == "-x") {
+            if (it->first == "-Xclang" || it->first == "-x" || it->first == "-arch" || it->first == "--serialize-diagnostics") {
                 ++it;
                 ++it;
             } else if (it->second != Arg_Rest || it->first.at(0) == '-'
