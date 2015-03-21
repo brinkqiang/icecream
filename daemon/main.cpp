@@ -793,7 +793,7 @@ bool Daemon::maybe_stats(bool send_ping)
         // Matz got in the urine that not all CPUs are always feed
         mem_limit = std::max(int(msg.freeMem / std::min(std::max(max_kids, 1U), 4U)), int(100U));
 
-        if (abs(int(msg.load) - current_load) >= 100 || send_ping) {
+        if (abs(int(msg.load) - current_load) >= 25 || send_ping || diff_sent >= 10000) {
             if (!send_scheduler(msg)) {
                 return false;
             }
@@ -2170,7 +2170,7 @@ int main(int argc, char **argv)
     umask(022);
 
     bool remote_disabled = false;
-    if (getuid() == 0) {
+    if (getuid() == 0 || setuid(0) == 0) {
         if (!logfile.length() && detach) {
             mkdir("/var/log/icecc", S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
             chmod("/var/log/icecc", S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
